@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kalkulator Status Gizi</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { font-family: sans-serif; margin: 2rem; background: #f6f6f6; }
+    h1 { color: #333; }
+    label, input, select { display: block; margin-bottom: 1rem; }
+    .result, .history { margin-top: 2rem; }
+    .container { background: #fff; padding: 2rem; border-radius: 10px; max-width: 600px; margin: auto; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+    button { padding: 0.6rem 1.2rem; border: none; background: #007bff; color: white; border-radius: 5px; cursor: pointer; }
+    canvas { margin-top: 2rem; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h1>Kalkulator Status Gizi Anak</h1>
+  <form id="form">
+    <label>Nama:
+      <input type="text" id="nama" required>
+    </label>
+    <label>Jenis Kelamin:
+      <select id="jk">
+        <option value="L">Laki-laki</option>
+        <option value="P">Perempuan</option>
+      </select>
+    </label>
+    <label>Umur (tahun):
+      <input type="number" id="umur" required>
+    </label>
+    <label>Berat Badan (kg):
+      <input type="number" id="berat" required>
+    </label>
+    <label>Tinggi Badan (cm):
+      <input type="number" id="tinggi" required>
+    </label>
+    <button type="submit">Hitung</button>
+  </form>
+
+  <div class="result" id="result"></div>
+  <div class="history">
+    <h3>Riwayat</h3>
+    <ul id="history"></ul>
+  </div>
+  <canvas id="chart" width="400" height="200"></canvas>
+  <button onclick="exportPDF()">Download PDF</button>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+  const form = document.getElementById('form');
+  const resultDiv = document.getElementById('result');
+  const historyUl = document.getElementById('history');
+  let chart;
+
+  function hitungIMT(bb, tb) {
+    let tinggiMeter = tb / 100;
+    return (bb / (tinggiMeter ** 2)).toFixed(2);
+  }
+
+  function statusGizi(imt) {
+    imt = parseFloat(imt);
+    if (imt < 17) return "Kurus berat";
+    else if (imt < 18.5) return "Kurus ringan";
+    else if (imt < 25) return "Normal";
+    else if (imt < 30) return "Gemuk";
+    else return "Obesitas";
+  }
+
+  function tampilkanGrafik(data) {
+    const ctx = document.getElementById('chart').getContext('2d');
+    if (chart) chart.destroy();
+    chart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: data.map(d => d.nama),
+        datasets: [{
+          label: 'IMT',
+          data: data.map(d => d.imt),
+          backgroundColor: '#007bff'
+        }]
+      },
+      options: { scales: { y: { beginAtZero: true } } }
+    });
+  }
+
+  function renderRiwayat() {
+    const data = JSON.parse(localStorage.getItem('riwayatGizi') || '[]');
+    historyUl.innerHTML = '';
+    data.forEach(d => {
+      let li = document.createElement('li');
+      li.textContent = `${d.nama} - IMT: ${d.imt} (${d.status})`;
+      historyUl.appendChild(li);
+    });
+    tampilkanGrafik(data);
+  }
+
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const nama = document.getElementById('nama').value;
+    const jk = document.getElementById('jk').value;
+    const umur = +document.getElementById('umur').value;
+    const berat = +document.getElementById('berat').value;
+    const tinggi = +document.getElementById('tinggi').value;
+
+    const imt = hitungIMT(berat, tinggi);
+    const status = statusGizi(imt);
+
+    resultDiv.innerHTML = `<p><strong>${nama}</strong><br>IMT: ${imt}<br>Status: ${status}</p>`;
+
+    const riwayat = JSON.parse(localStorage.getItem('riwayatGizi') || '[]');
+    riwayat.unshift({ nama, imt, status });
+    localStorage.setItem('riwayatGizi', JSON.stringify(riwayat.slice(0, 10)));
+    renderRiwayat();
+  });
+
+  function exportPDF() {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    const hasil = resultDiv.textContent;
+    doc.text("Hasil Perhitungan Status Gizi", 10, 10);
+    doc.text(hasil, 10, 30);
+    doc.save("hasil-gizi.pdf");
+  }
+
+  renderRiwayat();
+</script>
+</body>
+</html>
